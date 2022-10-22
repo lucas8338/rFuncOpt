@@ -14,7 +14,20 @@
 #' it is usefull to remove unwanted combination for for example when a parameter
 #' cant run ( is incompatible ) with another one.
 #' this will run through foreach.
-#' @import dplyr, foreach
+#' @return a list containing each run, this list is of the class 'rFuncOpt.result'
+#' and can be passed to the function 'rFuncOpt_asDataFrame' to convert it to a data.frame.
+#' @examples
+#' # bellow is a sample of params
+#' params<- list(first=1:5,second=5:10,third=list(tfirst=list('level2','level3','level4'),tsecond=list('level3','level4','level5')))
+#' # bellow is a sample of a function, this function is returning three metrics for example.
+#' defaultFunction<- function(...){ list(mae=2*rnorm(1),auc=3*rnorm(1),mape=5*rnorm(1)) }
+#'
+#' # run this function
+#' result<- rFuncOpt(defaultFunction=defaultFunction,params=params)
+#' print.simple.list(result)
+#'
+#' @import dplyr
+#' @import foreach
 #' @export
 rFuncOpt<- function(defaultFunction,
                     params,
