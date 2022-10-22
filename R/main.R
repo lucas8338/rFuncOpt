@@ -3,7 +3,7 @@
 #' @title rFuncOpt
 #' @description does a optimization of function parameters through searching.
 #' @param defaultFunction a function that takes a lot of arguments ( should to use an elipsis "..." )
-#' and return the metric you want
+#' and return a list or vector containing the metrics you want.
 #' @param params contains a list containing the name of parameter and its values.
 #' @param a function that takes the params and return a list of combinations. you can to use
 #' any the functions from comb.*
@@ -18,7 +18,7 @@
 #' @export
 rFuncOpt<- function(defaultFunction,
                     params,
-                    combinationFunction,
+                    combinationFunction=comb.expandGrid,
                     combinationRuleFunction=NULL,
                     thread.num=parallel::detectCores(),
                     thread.type=ifelse(Sys.info()[['sysname']]=='Windows', 'PSOCK','SOCK')
@@ -59,9 +59,11 @@ rFuncOpt<- function(defaultFunction,
   pg<- libGetDataR::util.generateForeachProgressBar(length(combinations))
   runs<- foreach::foreach( i=1:(length(combinations)),.options.snow=pg ) %dopar% {
     combination<- combinations[[i]]
-    result<- tryCatch( do.call( defaultFunction,list(combination) ),error = runError )
-    resultList<- list(iteration=i,parameters=combination,result=result)
+    runTime<- system.time( result<- tryCatch( do.call( defaultFunction,list(combination) ),error = runError ))[['elapsed']]
+    resultList<- list(iteration=i,parameters=combination,runTime=runTime,result=result)
   }
+
+  class(runs)<- 'rFuncOpt.result'
 
   runs
 
@@ -72,7 +74,89 @@ rFuncOpt<- function(defaultFunction,
 #' @return a data.frame
 #' @export
 rFuncOpt_asDataFrame<- function(data){
-  iteration<- 1:(length(data))
+  stopifnot("class of 'data' is not 'rFuncOpt.result'"=class(data)=='rFuncOpt.result')
 
-  parameters
+  sht.parameters<- data[[1]][['parameters']]
+
+  sht.result<- data[[1]][['result']]
+
+  row.iterations<- 1:(length(data))
+
+  row.runTime<- c()
+
+  for ( i in data ){
+    row.runTime<- append(row.runTime,i[['runTime']])
+  }
+
+  col.parameters<- names( sht.parameters )
+
+  for ( i in 1:(length(col.parameters)) ){
+    col.parameters[[i]]<- glue::glue("parameter.{col.parameters[[i]]}")
+  }
+
+  int.nmetrics<- length( sht.result )
+
+  int.nmetricsNullName<- 0
+
+  for ( name in names(sht.result) ){
+    if ( is.null(name) || name=="" ){
+      int.nmetricsNullName<- int.nmetricsNullName+1
+    }
+  }
+
+  int.possibleMissingNames<- c()
+
+  if ( int.nmetricsNullName>0 ){
+    for ( i in 1:int.nmetricsNullName ){
+      int.possibleMissingNames<- append(int.possibleMissingNames,glue::glue("metric{i}"))
+    }
+  }
+
+  for ( i in 1:(length(names(sht.result))) ){
+    name<- names(sht.result)[[i]]
+    if ( is.null(name) || name=="" ){
+      names(sht.result)[[i]]<- int.possibleMissingNames[[1]]
+      int.possibleMissingNames<- int.possibleMissingNames[-1]
+    }
+  }
+
+  cols<- list('iteration')
+
+  cols<- append(cols,col.parameters)
+
+  cols<- append(cols,'runTime')
+
+  cols<- append(cols,names(sht.result))
+
+  result<- data.frame(matrix(nrow = 0,ncol = length(cols)))
+
+  colnames(result)<- cols
+
+  for ( i in 1:(length(data)) ){
+    result[i,'iteration']<- data[[i]][['iteration']]
+    for ( cname in colnames(result)[2:(length(colnames(result)))] ){
+      #parameters
+      if ( stringr::str_starts(cname,'parameter.') ){
+        text<- stringr::str_split(cname,'[.]')[[1]]
+        text<- capture.output(cat(text[2:(length(text))],sep=""))
+        result[i,cname]<- capture.output(cat(as.character(data[[i]][['parameters']][[text]])))
+      }
+      result[i,'runTime']<- data[[i]][['runTime']]
+
+      startmetrics<- match('runTime',colnames(result))+1
+      startmetrics<- colnames(result)[startmetrics:length(colnames(result))]
+      newNmetrics<- 1:int.nmetrics
+      for ( metric in startmetrics ){
+        if ( data[[i]][['result']][[1]]=='error' ){
+          result[i,metric]<- 'error'
+        }else{
+          result[i,metric]<- data[[i]][['result']][[newNmetrics[[1]]]]
+          newNmetrics<- newNmetrics[-1]
+        }
+      }
+    }
+  }
+
+  result
+
 }
