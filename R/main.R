@@ -38,7 +38,6 @@
 #' @export
 rFuncOpt<- function(defaultFunction, params) {
   # declare cores
-  cl<- parallel::makeCluster(spec=thread.num,type=thread.type)
   .className<- 'rFuncResult'
 
   stopifnot("'defaultFunction' needs to be a function"=is.function(defaultFunction))
