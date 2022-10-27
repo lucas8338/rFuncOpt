@@ -9,7 +9,7 @@
 #' esample: comb.randomExpandGrid()
 #' @param thread.num the number of threads to run each execution in parallel
 #' @param thread.type the type of thread default is 'PSOCK' for windows or 'SOCK' if not windows.
-#' #' @return a list containing each run, this list is of the class 'rFuncOpt.result'
+#' @return a list containing each run, this list is of the class 'rFuncOpt.result'
 #' and can be passed to the function 'rFuncOpt_asDataFrame' to convert it to a data.frame.
 #' @examples
 #' # bellow is a sample of params
@@ -64,12 +64,12 @@ rFuncOpt<- function(defaultFunction,
   logger::log_info(glue::glue("will run optimization for {nrow(params)} iterations
   using {thread.num} thread for each execution."))
   pg<- libGetDataR::util.generateForeachProgressBar(nrow(params))
-  runs<- foreach::foreach( i=1:(nrow(params)),.options.snow=pg ) %dopar% {
+  tryCatch(runs<- foreach::foreach( i=1:(nrow(params)),.options.snow=pg ) %dopar% {
     combination<- params[i,]
     runTime<- system.time( result<- tryCatch( do.call( defaultFunction,list(combination) ),error = runError ))[['elapsed']]
     resultList<- list(iteration=i,parameters=combination,runTime=runTime,result=result)
     resultList
-  }
+  },finally = function (e){class(runs)<- 'rFuncOpt.result';return(runs)})
 
   class(runs)<- 'rFuncOpt.result'
 
