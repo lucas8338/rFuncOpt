@@ -7,39 +7,45 @@
 rFuncOpt(
   defaultFunction,
   params,
-  combinationFunction = comb.expandGrid,
-  combinationRuleFunction = NULL,
   thread.num = parallel::detectCores(),
   thread.type = ifelse(Sys.info()[["sysname"]] == "Windows", "PSOCK", "SOCK")
 )
 }
 \arguments{
-\item{defaultFunction}{a function that takes a lot of arguments ( should to use an elipsis "..." )
-and return a list or vector containing the metrics you want.}
+\item{defaultFunction}{a function that takes one argument or elipsis
+and return a list or vector or double containing the result.}
 
-\item{params}{contains a list containing the name of parameter and its values.}
+\item{params}{contains a data.frame containing the name of parameter as column and its values.
+one of ways to generate this data.frame is using the function of this package comb.*
+esample: comb.randomExpandGrid()}
 
-\item{combinationRuleFunction}{is a function to run for each combination in a list
-remember 'the combination is a list' so each value of the list will be passed to this
-function through of a loop' this function should to return the combination if wants to keep
-or return NULL if the combination is unwanted.
-it is usefull to remove unwanted combination for for example when a parameter
-cant run ( is incompatible ) with another one.
-this will run through foreach.}
+\item{thread.num}{the number of threads to run each execution in parallel}
 
-\item{a}{function that takes the params and return a list of combinations. you can to use
-any the functions from comb.*}
-}
-\value{
-a list containing each run, this list is of the class 'rFuncOpt.result'
-and can be passed to the function 'rFuncOpt_asDataFrame' to convert it to a data.frame.
+\item{thread.type}{the type of thread default is 'PSOCK' for windows or 'SOCK' if not windows.
+#' @return a list containing each run, this list is of the class 'rFuncOpt.result'
+and can be passed to the function 'rFuncOpt_asDataFrame' to convert it to a data.frame.}
 }
 \description{
 does a optimization of function parameters through searching.
 }
+\section{Unwanted params}{
+
+if you dont want the optimization run for especific rows or params, remove them before running this function
+for example:
+lets think you have these parameters: 'name, age, canDrive'. the parameter 'name' contains the name of the user
+the parameter 'age' contains the age, and 'canDrive' is a boolean saying if the person is habilited to drive a car.
+the minimum age i will consider to drive is the 16.
+so yours params are: data.frame( name=list('jessica','carla',jennifer'),age=list(19,14,16),canDrive=list(TRUE,FALSE) ).
+there no reason to test the parameters when the carDrive==TRUE and age<16, in this case we can remove these combinations..
+is possible to do this doing:
+
+params<- params(-which(params[\link{'age'}]<16 & params[\link{'canDrive'}]==TRUE),)
+}
+
 \examples{
 # bellow is a sample of params
 params<- list(first=1:5,second=5:10,third=list(tfirst=list('level2','level3','level4'),tsecond=list('level3','level4','level5')))
+params<- comb.randomExpandGrid(params)
 # bellow is a sample of a function, this function is returning three metrics for example.
 defaultFunction<- function(...){ list(mae=2*rnorm(1),auc=3*rnorm(1),mape=5*rnorm(1)) }
 
