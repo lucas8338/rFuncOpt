@@ -58,8 +58,7 @@ rFuncOpt<- function(defaultFunction, params) {
   class(.GlobalEnv[['rFuncopt.result.temporary']])<- .className
 
   # here is the main loop to train the 'defaultFunction' with params.
-  logger::log_info(glue::glue("will run optimization for {nrow(params)} iterations
-  using {thread.num} thread for each execution."))
+  logger::log_info(glue::glue("will run optimization for {nrow(params)} iterations."))
   pb <- progress::progress_bar$new(format = "running [:bar] :percent in :elapsed eta: :eta", total = nrow(params), clear = FALSE)
   for( i in 1:(nrow(params)) ){
     pb$tick()
