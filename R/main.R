@@ -69,7 +69,7 @@ rFuncOpt<- function(defaultFunction,
     runTime<- system.time( result<- tryCatch( do.call( defaultFunction,list(combination) ),error = runError ))[['elapsed']]
     resultList<- list(iteration=i,parameters=combination,runTime=runTime,result=result)
     resultList
-  },finally = function (e){class(runs)<- 'rFuncOpt.result';return(runs)})
+  },error = function (e){class(runs)<- 'rFuncOpt.result';return(runs)})
 
   class(runs)<- 'rFuncOpt.result'
 
