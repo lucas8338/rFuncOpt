@@ -2,19 +2,33 @@
 
 #' @title rFuncOpt
 #' @description does a optimization of function parameters through searching.
-#' @param defaultFunction a function that takes a lot of arguments ( should to use an elipsis "..." )
-#' and return a list or vector containing the metrics you want.
+#' @param defaultFunction a function that takes one argument or elipsis
+#' and return a list or vector or double containing the result.
 #' @param params contains a list containing the name of parameter and its values.
-#' @param a function that takes the params and return a list of combinations. you can to use
+#' @param combinationFunction a function that takes the params and return a data.frame of combinations. you can to use
 #' any the functions from comb.*
-#' @param combinationRuleFunction is a function to run for each combination in a list
-#' remember 'the combination is a list' so each value of the list will be passed to this
-#' function through of a loop' this function should to return the combination if wants to keep
-#' or return NULL if the combination is unwanted.
-#' it is usefull to remove unwanted combination for for example when a parameter
-#' cant run ( is incompatible ) with another one.
-#' this will run through foreach.
-#' @return a list containing each run, this list is of the class 'rFuncOpt.result'
+#' for ecample: comb.randomExpandGrid
+#' if you have your self generated data.frame of parameters for any motive you can pass a function that takes
+#' a argument and return the self argument example: function(e){e}.
+#' @param combinationRule is a iterable with strings to pass to filter the result of combinations
+#' this will be used to remove invalid combinations. the string should to use the variable 'combinations' to filter
+#' syntax: " combinations[['yourParam']]'==unwantedResult && combinations[['OptionalParam']]==anotherUnwantedResult "
+#' the syntax bellow will pass the string to a "-which()" function to drop rows from the combinations data.frame.
+#' example:
+#' # lets think you have a the parameters: 'name, age, canDrive'. the parameter 'name' contains the name of the user
+#' # the parameter 'age' contains the 'age', and 'canDrive' is a boolean saying if the person is habilited to drive a car.
+#' # the minimum age i will consider to drive is the 16.
+#' # so yours params are: list( name=list('jessica','carla',jennifer'),age=list(19,14,16),canDrive=list(TRUE,FALSE) ).
+#' # there no reason to test the parameters when the carDrive==TRUE and age<16, in this case we can remove these combinations.
+#' # this is the case of use of this parameter 'combinationRule'.
+#' # is possible to do this doing:
+#'
+#' rule<- list("combinations[['age']]<16 && combinations[['canDrive']]==TRUE")
+#'
+#' using the function above rows of cobinations that are ok with the combinations will be removed.
+#' @param thread.num the number of threads to run each execution in parallel
+#' @param thread.type the type of thread default is 'PSOCK' for windows or 'SOCK' if not windows.
+#' #' @return a list containing each run, this list is of the class 'rFuncOpt.result'
 #' and can be passed to the function 'rFuncOpt_asDataFrame' to convert it to a data.frame.
 #' @examples
 #' # bellow is a sample of params
@@ -31,8 +45,8 @@
 #' @export
 rFuncOpt<- function(defaultFunction,
                     params,
-                    combinationFunction=comb.expandGrid,
-                    combinationRuleFunction=NULL,
+                    combinationFunction=comb.randomExpandGrid,
+                    combinationRule=NULL,
                     thread.num=parallel::detectCores(),
                     thread.type=ifelse(Sys.info()[['sysname']]=='Windows', 'PSOCK','SOCK')
 ){
@@ -43,19 +57,16 @@ rFuncOpt<- function(defaultFunction,
 
   stopifnot("'defaultFunction' needs to be a function"=is.function(defaultFunction))
   stopifnot("'params' need to be a list"=is.list(params))
-  stopifnot("'combinationFunction' need to be a function"=is.function(combinationFunction))
 
   # run the combination function on 'params'.
   combinations<- do.call(combinationFunction,list(params))
 
   # if there a rule function will run the rule function for each combination in parallel.
-  if ( !is.null(combinationRuleFunction) ){
+  if ( !is.null(combinationRule) ){
     logger::log_info("running combinationRuleFunction for each combination...")
-    pg<- libGetDataR::util.generateForeachProgressBar(length(combinations))
-    newCombinations<- foreach::foreach( i=1:(length(combinations)),.options.snow=pg ) %dopar% {
-      do.call( combinationRuleFunction,list(combinations[[i]]) )
+    for ( rule in combinationRule ){
+      combinations<- combinations[-which(eval(parse(text=rule))),]
     }
-    combinations <- newCombinations[sapply(newCombinations,function(e)!is.null(e))]
   }
 
   # a function to handle when happen an error during defaultFunction execution.
@@ -71,11 +82,12 @@ rFuncOpt<- function(defaultFunction,
   # here is the main loop to train the 'defaultFunction' with params.
   logger::log_info(glue::glue("will run optimization for {length(combinations)} iterations
   using {thread.num} thread for each execution."))
-  pg<- libGetDataR::util.generateForeachProgressBar(length(combinations))
-  runs<- foreach::foreach( i=1:(length(combinations)),.options.snow=pg ) %dopar% {
-    combination<- combinations[[i]]
+  pg<- libGetDataR::util.generateForeachProgressBar(nrow(combinations))
+  runs<- foreach::foreach( i=1:(nrow(combinations)),.options.snow=pg ) %dopar% {
+    combination<- combinations[i,]
     runTime<- system.time( result<- tryCatch( do.call( defaultFunction,list(combination) ),error = runError ))[['elapsed']]
     resultList<- list(iteration=i,parameters=combination,runTime=runTime,result=result)
+    resultList
   }
 
   class(runs)<- 'rFuncOpt.result'
