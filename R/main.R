@@ -78,7 +78,7 @@ rFuncOpt<- function(defaultFunction,
 
     return('error')
   }
-
+  exportedCombinations<<- combinations
   # here is the main loop to train the 'defaultFunction' with params.
   logger::log_info(glue::glue("will run optimization for {nrow(combinations)} iterations
   using {thread.num} thread for each execution."))
