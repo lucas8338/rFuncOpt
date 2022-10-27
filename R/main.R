@@ -7,10 +7,9 @@
 #' @param params contains a data.frame containing the name of parameter as column and its values.
 #' one of ways to generate this data.frame is using the function of this package comb.*
 #' esample: comb.randomExpandGrid()
-#' @param thread.num the number of threads to run each execution in parallel
-#' @param thread.type the type of thread default is 'PSOCK' for windows or 'SOCK' if not windows.
 #' @return a list containing each run, this list is of the class 'rFuncOpt.result'
 #' and can be passed to the function 'rFuncOpt_asDataFrame' to convert it to a data.frame.
+#' if the function is interrupted will be there a variable called rFuncOpt.result.temporary in the globalEnv
 #' @examples
 #' # bellow is a sample of params
 #' params<- list(first=1:5,second=5:10,third=list(tfirst=list('level2','level3','level4'),tsecond=list('level3','level4','level5')))
@@ -37,15 +36,10 @@
 #' @import dplyr
 #' @import foreach
 #' @export
-rFuncOpt<- function(defaultFunction,
-                    params,
-                    thread.num=parallel::detectCores(),
-                    thread.type=ifelse(Sys.info()[['sysname']]=='Windows', 'PSOCK','SOCK')
-){
+rFuncOpt<- function(defaultFunction, params) {
   # declare cores
   cl<- parallel::makeCluster(spec=thread.num,type=thread.type)
-  doSNOW::registerDoSNOW(cl)
-  on.exit(parallel::stopCluster(cl))
+  .className<- 'rFuncResult'
 
   stopifnot("'defaultFunction' needs to be a function"=is.function(defaultFunction))
   stopifnot("'params' need to be a data.frame"=is.data.frame(params))
@@ -60,20 +54,27 @@ rFuncOpt<- function(defaultFunction,
     return('error')
   }
 
+  .GlobalEnv[['rFuncopt.result.temporary']]<- list()
+
+  class(.GlobalEnv[['rFuncopt.result.temporary']])<- .className
+
   # here is the main loop to train the 'defaultFunction' with params.
   logger::log_info(glue::glue("will run optimization for {nrow(params)} iterations
   using {thread.num} thread for each execution."))
-  pg<- libGetDataR::util.generateForeachProgressBar(nrow(params))
-  tryCatch(runs<- foreach::foreach( i=1:(nrow(params)),.options.snow=pg ) %dopar% {
+  pb <- progress::progress_bar$new(format = "running [:bar] :percent in :elapsed eta: :eta", total = nrow(params), clear = FALSE)
+  for( i in 1:(nrow(params)) ){
+    pb$tick()
     combination<- params[i,]
     runTime<- system.time( result<- tryCatch( do.call( defaultFunction,list(combination) ),error = runError ))[['elapsed']]
     resultList<- list(iteration=i,parameters=combination,runTime=runTime,result=result)
-    resultList
-  },error = function (e){class(runs)<- 'rFuncOpt.result';return(runs)})
+    .GlobalEnv[['rFuncopt.result.temporary']]<- append(.GlobalEnv[['rFuncopt.result.temporary']],list(resultList))
+  }
 
-  class(runs)<- 'rFuncOpt.result'
+  result<- .GlobalEnv[['rFuncopt.result.temporary']]
 
-  runs
+  rm('rFuncopt.result.temporary',envir = globalenv())
+
+  result
 
 }
 
