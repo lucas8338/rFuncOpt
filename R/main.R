@@ -4,22 +4,12 @@
 #' @description does a optimization of function parameters through searching.
 #' @param defaultFunction a function that takes one argument or elipsis
 #' and return a list or vector or double containing the result.
-#' @param params contains a data.frame containing the name of parameter as column and its values.
-#' one of ways to generate this data.frame is using the function of this package comb.*
-#' esample: comb.randomExpandGrid()
+#' @param params takes a data.frame containing the name of parameter as column and its values.
+#' one of ways to generate this data.frame is using one of the function of this package comb.*
+#' example: comb.randomExpandGrid()
 #' @return a list containing each run, this list is of the class 'rFuncOpt.result'
 #' and can be passed to the function 'rFuncOpt_asDataFrame' to convert it to a data.frame.
 #' if the function is interrupted will be there a variable called rFuncOpt.result.temporary in the globalEnv
-#' @examples
-#' # bellow is a sample of params
-#' params<- list(first=1:5,second=5:10,third=list(tfirst=list('level2','level3','level4'),tsecond=list('level3','level4','level5')))
-#' params<- comb.randomExpandGrid(params)
-#' # bellow is a sample of a function, this function is returning three metrics for example.
-#' defaultFunction<- function(...){ list(mae=2*rnorm(1),auc=3*rnorm(1),mape=5*rnorm(1)) }
-#'
-#' # run this function
-#' result<- rFuncOpt(defaultFunction=defaultFunction,params=params)
-#' print.simple.list(result)
 #'
 #' @section Unwanted params:
 #' if you dont want the optimization run for especific rows or params, remove them before running this function
@@ -33,44 +23,51 @@
 #'
 #' params<- params(-which(params[['age']]<16 & params[['canDrive']]==TRUE),)
 #'
+#' #' @examples
+#' # bellow is a sample of params
+#' params<- list(first=1:5,second=5:10,third=list(tfirst=list('level2','level3','level4'),tsecond=list('level3','level4','level5')))
+#' params<- comb.randomExpandGrid(params)
+#' # bellow is a sample of a function, this function is returning three metrics for example.
+#' defaultFunction<- function(...){ list(mae=2*rnorm(1),auc=3*rnorm(1),mape=5*rnorm(1)) }
+#'
+#' # run this function
+#' result<- rFuncOpt(defaultFunction=defaultFunction,params=params)
+#' print.simple.list(result)
+#'
 #' @import dplyr
 #' @import foreach
 #' @export
 rFuncOpt<- function(defaultFunction, params) {
-  # declare cores
-  .className<- 'rFuncResult'
 
   stopifnot("'defaultFunction' needs to be a function"=is.function(defaultFunction))
   stopifnot("'params' need to be a data.frame"=is.data.frame(params))
 
   # a function to handle when happen an error during defaultFunction execution.
   runError<- function(e){
-    warning(glue::glue(cat("was there an error during the execution of the 'defaultFunction' at iteration=={i}
-    with the parameter=={combination}
-    the errow was:
-    {e}")))
+    print(suppressWarnings(stringr::str_c("error: ", e, "| iteration: ",i)))
 
     return('error')
   }
 
-  .GlobalEnv[['rFuncopt.result.temporary']]<- list()
-
-  class(.GlobalEnv[['rFuncopt.result.temporary']])<- .className
+  .GlobalEnv[['rFuncOpt.result.temporary']]<- list()
 
   # here is the main loop to train the 'defaultFunction' with params.
   logger::log_info(glue::glue("will run optimization for {nrow(params)} iterations."))
   pb <- progress::progress_bar$new(format = "running [:bar] :percent in :elapsed eta: :eta", total = nrow(params), clear = FALSE)
   for( i in 1:(nrow(params)) ){
     pb$tick()
-    combination<- params[i,]
-    runTime<- system.time( result<- tryCatch( do.call( defaultFunction,list(combination) ),error = runError ))[['elapsed']]
+    # the lapply is needed cause the dataframe will return a list of list for every column
+    # so i need so select the item [[1]] so get the correct, cause this dataframe there
+    # only one index
+    combination<- lapply(params[i,],function(data){data[[1]]})
+    runTime<- system.time( result<- tryCatch( do.call( defaultFunction,combination ),error = runError ))[['elapsed']]
     resultList<- list(iteration=i,parameters=combination,runTime=runTime,result=result)
-    .GlobalEnv[['rFuncopt.result.temporary']]<- append(.GlobalEnv[['rFuncopt.result.temporary']],list(resultList))
+    .GlobalEnv[['rFuncOpt.result.temporary']]<- append(.GlobalEnv[['rFuncOpt.result.temporary']],list(resultList))
   }
 
-  result<- .GlobalEnv[['rFuncopt.result.temporary']]
+  result<- .GlobalEnv[['rFuncOpt.result.temporary']]
 
-  rm('rFuncopt.result.temporary',envir = globalenv())
+  rm('rFuncOpt.result.temporary',envir = globalenv())
 
   result
 
@@ -82,7 +79,6 @@ rFuncOpt<- function(defaultFunction, params) {
 #' @return a data.frame
 #' @export
 rFuncOpt_asDataFrame<- function(data){
-  stopifnot("class of 'data' is not 'rFuncOpt.result'"=class(data)=='rFuncOpt.result')
   stopifnot("the first execution of data there 'error' the first execution cant have error,
    cause this function use them to generate the colnames of the data.frame"=data[[1]][['result']][[1]]!='error')
 
@@ -165,13 +161,13 @@ rFuncOpt_asDataFrame<- function(data){
     for ( cname in colnames(result)[2:(length(colnames(result)))] ){
       # only will run if the name of the column there the prefix 'parameter.' indicating is a column for parameter
       if ( stringr::str_starts(cname,'parameter.') ){
-        # as str_split uses reges to split by '.' (dot) is needed to use '[]' with dot inside
-        # this split will be used to get the data to the column
-        text<- stringr::str_split(cname,'[.]')[[1]]
-        # the function 'capture.output' is used to capture the output cause the 'cat' function return NULL at end
-        text<- capture.output(cat(text[2:(length(text))],sep=""))
+        # remove the 'parameter.' text
+        text<- stringr::str_remove(cname,"parameter.")
         # set the value
-        result[i,cname]<- capture.output(cat(as.character(data[[i]][['parameters']][[text]])))
+        value<- capture.output(cat(as.character(data[[i]][['parameters']][[text]])))
+        # as the variable 'value' converts anything to string, when null it will
+        # return a character vector of length==0
+        result[i,cname]<- ifelse(length(value)!=0,value,'NULL')
       }
       # set the value of the column 'runTime'
       result[i,'runTime']<- data[[i]][['runTime']]
