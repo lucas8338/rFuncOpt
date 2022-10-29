@@ -21,9 +21,9 @@
 #' there no reason to test the parameters when the carDrive==TRUE and age<16, in this case we can remove these combinations..
 #' is possible to do this doing:
 #'
-#' params<- params(-which(params[['age']]<16 & params[['canDrive']]==TRUE),)
+#' params<- params[-which(params[['age']]<16 & params[['canDrive']]==TRUE),]
 #'
-#' #' @examples
+#' @examples
 #' # bellow is a sample of params
 #' params<- list(first=1:5,second=5:10,third=list(tfirst=list('level2','level3','level4'),tsecond=list('level3','level4','level5')))
 #' params<- comb.randomExpandGrid(params)

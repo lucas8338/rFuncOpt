@@ -4,26 +4,20 @@
 \alias{rFuncOpt}
 \title{rFuncOpt}
 \usage{
-rFuncOpt(
-  defaultFunction,
-  params,
-  thread.num = parallel::detectCores(),
-  thread.type = ifelse(Sys.info()[["sysname"]] == "Windows", "PSOCK", "SOCK")
-)
+rFuncOpt(defaultFunction, params)
 }
 \arguments{
 \item{defaultFunction}{a function that takes one argument or elipsis
 and return a list or vector or double containing the result.}
 
-\item{params}{contains a data.frame containing the name of parameter as column and its values.
-one of ways to generate this data.frame is using the function of this package comb.*
-esample: comb.randomExpandGrid()}
-
-\item{thread.num}{the number of threads to run each execution in parallel}
-
-\item{thread.type}{the type of thread default is 'PSOCK' for windows or 'SOCK' if not windows.
-#' @return a list containing each run, this list is of the class 'rFuncOpt.result'
-and can be passed to the function 'rFuncOpt_asDataFrame' to convert it to a data.frame.}
+\item{params}{takes a data.frame containing the name of parameter as column and its values.
+one of ways to generate this data.frame is using one of the function of this package comb.*
+example: comb.randomExpandGrid()}
+}
+\value{
+a list containing each run, this list is of the class 'rFuncOpt.result'
+and can be passed to the function 'rFuncOpt_asDataFrame' to convert it to a data.frame.
+if the function is interrupted will be there a variable called rFuncOpt.result.temporary in the globalEnv
 }
 \description{
 does a optimization of function parameters through searching.
@@ -39,7 +33,7 @@ so yours params are: data.frame( name=list('jessica','carla',jennifer'),age=list
 there no reason to test the parameters when the carDrive==TRUE and age<16, in this case we can remove these combinations..
 is possible to do this doing:
 
-params<- params(-which(params[\link{'age'}]<16 & params[\link{'canDrive'}]==TRUE),)
+params<- params[-which(params[\link{'age'}]<16 & params[\link{'canDrive'}]==TRUE),]
 }
 
 \examples{
