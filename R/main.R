@@ -53,7 +53,7 @@ rFuncOpt<- function(defaultFunction, params) {
 
   # here is the main loop to train the 'defaultFunction' with params.
   logger::log_info(glue::glue("will run optimization for {nrow(params)} iterations."))
-  pb <- progress::progress_bar$new(format = "running [:bar] :percent in :elapsed eta: :eta", total = nrow(params), clear = FALSE)
+  pb <- progress::progress_bar$new(format = "running: (:current/:total | :tick_rateit/s | :percent | elapsed: :elapsedfull | eta: :eta)", total = nrow(params), clear = FALSE)
   for( i in 1:(nrow(params)) ){
     pb$tick()
     # the lapply is needed cause the dataframe will return a list of list for every column
